@@ -1,0 +1,396 @@
+---
+title: "Zadanie zaliczeniowe Statystyka 24/25L"
+author: "Maksymilian Kulicki"
+date: "2024-12-27"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+\tableofcontents
+
+\newpage
+\hrule
+
+```{r include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(binom)
+library(stats)
+```
+
+\section{1. Opis Danych}
+\hrule
+Dane do zadania zostały pobrane ze strony https://www.kaggle.com/datasets/lorenzozoppelletto/financial-risk-for-loan-approval?select=Loan.csv. Zostały one wygenerowane sztucznie przez skrypt napisany przez autora.Są to dane finansowe, używane do celów edukacyjnych w Data Sciencie. Dane zawierają podstawowe informacje dotyczące osób ubiegających się o kredyt. W ostatnich dwóch kolumnach podana jest informacja czy dana osoba uzyskała kredyt oraz wskaźnik ryzyka związany z tą osobą. 
+Popatrzmy na dane :
+
+
+```{r}
+dataSet <- read.csv("C:/Users/Maksym/Downloads/Loan.csv")
+
+dataSet[1:7,1:11]
+
+dim(dataSet)
+
+any(is.na(dataSet))
+```
+
+Dane są dość spore. Zawierają 20000 obserwacji oraz 36 cech i żadnych brakujących wartości. W raporcie zajmiemy się tylko niektórymi z nich. Przyjrzyjmy się cechom, które będziemy badać w dalszej częsci raportu. Są to kolumny : "Age", "Annual Income", "CreditScore", "EducationLevel",
+"BaseInterestRate", "InterestRate,"LoanAmount". Wybrałem te zmienne ze względu na najciekawsze właściwości statystyczne. 
+\par
+\newpage
+\subsection{Informacje o zmiennych ilościowych}
+Popatrzmy na podstawowe statystyki danych ilościowych.
+
+```{r}
+columns <- c("Age", "AnnualIncome", "CreditScore",
+"BaseInterestRate", "InterestRate", "LoanAmount")
+
+
+for (i in columns){
+  cat("\nSummary for:", i, "\n")
+  print(summary(dataSet[[i]]))
+  cat("Standard Deviation:",sd(dataSet[[i]]), "\n")
+}
+
+```
+Powyżej mamy informacje o maksimach, minimach, średnich, medianach, kwantylach oraz o odchyleniu standardowym poszczególnych zmiennych ilościowych.
+\par
+\newpage
+\subsection{Informacje o zmiennych jakościowych}
+Popatrzmy również na liczności poszczególnych grup zmiennych jakościowych.
+
+```{r}
+table(dataSet$EducationLevel)
+table(dataSet$EmploymentStatus)
+```
+Pierwsza zmienna jakościowa pokazuje poziom edukacji poszczególnych osób. Grupy co do rzędu są równoliczne, poza grupą osób z Doktoratem. 
+\par
+Druga zmienna jakościowa dzieli osoby ze względu na status zatrudnienia. Najliczenijsza grupa to osoby zatrudnione.
+\par
+\newpage
+\hrule
+\section{2. Analiza zmiennej Annual Income w podziale na zmienną Age}
+\hrule
+Popatrzmy jak wygląda wykres zmiennej AnnualIncome w podziale na zmienną Age na wykresie pudełkowym.
+
+\subsection{Wykres pudełkowy rozkładu w podziale na wykształcenie nr 1}
+
+```{r}
+ggplot(dataSet, aes(x = EducationLevel, y = AnnualIncome)) +
+  geom_boxplot() +
+  labs(title = "Rozkład Rocznego dochodu w podziale na wykształcenie",
+       x = "Wykształcenie", y = "Roczny Dochód") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+
+```
+
+Spróbujmy zmiejszyć zakres zmiennej y.
+
+\newpage
+
+\subsection{Wykres pudełkowy rozkładu w podziale na wykształcenie nr 2}
+
+```{r error=FALSE, message=FALSE, warning=FALSE}
+ggplot(dataSet, aes(x = EducationLevel, y = AnnualIncome)) +
+geom_boxplot() +
+labs(title = "Wykres pudełkowy z czterema zmiennymi jakościowymi",
+     x = "Wykształcenie", y = "Roczny dochód") +
+theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+ylim(0,80000)  
+
+
+```
+
+Można by podejrzewać, że roczny dochód będzie większy razem z lepszym wykształceniem. Rzeczywiście widać nieznaczną różnicę pomiędzy ludźmi, którzy skończyli liceum, a ludźmi po magisterium i doktoracie. Różnica ta wynosi średnio około 8000.
+\par
+Pomimo tej różnicy rozkłady są zbliżone. Jest to zapewne spowodowane wygenerowaniem danych sztucznie.
+\par
+
+\newpage
+\subsection{Tabela statystyk w podziale na wykształcenie}
+
+Popatrzmy na tabelkę z statystykami w podziale na wykształcenie:
+
+```{r}
+tabela_stat <- dataSet %>%
+  group_by(EducationLevel) %>%
+  summarise(
+    srednia = mean(AnnualIncome),
+    mediana = median(AnnualIncome),
+    minimum = min(AnnualIncome),
+    maksimum = max(AnnualIncome),
+    odchylenie_std = sd(AnnualIncome)
+  )
+kable(tabela_stat, caption = "Statystyki opisowe w podziale na wykształcenie")
+
+```
+
+Z powyższej tabelki możemy wywnioskować nieznaczną ale istniejącą korelacje pomiędzy lepszym wykształceniem, a większym rocznym dochodem. Poza tym 
+warto zauważyć istnienie swojego rodzaje wynagrodzenia minimalnego wynoszącego 15000.
+
+\newpage 
+
+\hrule
+\section{3. Zależność liniowa pomiędzy zmienną BaseInterestRate, a CreditScore}
+\hrule
+
+Popatrzmy na wykres zmiennej BaseInterestRate, a zmienną CreditScore:
+
+\subsection{Wykres}
+
+```{r}
+ggplot(dataSet,aes(x = BaseInterestRate,y = CreditScore)) + 
+  geom_point(color = "blue", size = 2, alpha = 0.7) +  
+  geom_smooth(method = "lm", color = "red", se = FALSE, linewidth = 1) + 
+  theme_minimal() +
+  ylim(200, 800) +
+  labs(
+    y = "Punktacja Kredytowa",
+    x = "Bazowa stopa procentowa"
+  )
+
+```
+
+Widzimy, że odsetki, które kredytobiorca będzie płacił zależą od punktów kredytowych, czego można się było spodziewać.
+Nie jest to zależność perfekcyjna, ponieważ dane są rozstrzelone, ale widać korelacje ujemną między zmiennymi.Napewno jest to zależność liniowa i 
+nie potrzebujemy dopasowywać wielomianów wyższego stopnia.
+\par
+
+
+\hrule
+\section{4. Dopasowanie rozkładu dla zmiennej AnnualIncome}
+\hrule
+
+\subsection{Wizualizacja rozkładu danych empirycznych}
+
+Przyjrzyjmy się histogramowi naszej zmiennej.
+
+```{r, message = FALSE, warning = FALSE}
+ggplot(dataSet, aes(x = dataSet$AnnualIncome)) +
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.7, color = "black") +
+  labs(title = "Histogram danych", x = "AnnualIncome", y = "Częstotliwość") +
+  theme_minimal() +
+  xlim(0, 400000)
+
+```
+
+Spróbujmy użyć transformacji naszego rozkładu, logarytmu z rozkładu.
+
+```{r}
+log_AnnualIncome <- log(dataSet$AnnualIncome)
+
+
+ggplot(dataSet, aes(x = log_AnnualIncome)) +
+  geom_histogram(bins = 30, fill = "green", alpha = 0.7, color = "black") +
+  labs(title = "Histogram danych po transformacji logarytmicznej", x = "Log(AnnualIncome)", y = "Częstotliwość") +
+  theme_minimal()
+
+```
+
+Na pierwszy rzut oka logarytm z naszego rozkładu wygląda na rozkład normalny. Przeprowadźmy dalszą analizę statystyczną, aby to potwierdzić lub zaprzeczyć.
+\par
+
+\subsection{Analiza rozkładu - wykresy}
+
+Na początku dopasujmy parametry. Niezależnie czy wybierzemy metodę momentów, czy metodę największej wiarygodności otrzymamy ten sam wynik dla rozkładu normalnego :
+
+\[
+\hat{\mu} = \frac{1}{n} \sum_{i=1}^n X_i
+\]
+
+\[
+\hat{\sigma}^2 = \frac{1}{n} \sum_{i=1}^n (X_i - \hat{\mu})^2
+\] 
+, gdzie X_i to pojedyncza próbka, mu to wartość oczekiwana, a sigma^2 to wariancja.
+\par
+Teraz narysujmy wykres kwantylowy dla dopasowania 
+
+```{r}
+qqplot(qnorm(ppoints(length(log_AnnualIncome)), mean = 10.798, sd = 0.610),
+       log_AnnualIncome,
+       main = "QQ-Plot dla danych logarytmicznych z parametrami",
+       xlab = "Teoretyczne kwantyle", ylab = "Empiryczne kwantyle")
+grid(nx = NULL, ny = NULL, col = "gray", lty = "solid", lwd = 1)
+abline(0, 1, col = "red", lwd = 2)
+
+```
+
+Na wykresie widzimy całkiem niezłe dopasowanie, problem stanowią największe i najmniejsze wartości. Rzeczywiście na histogramie mogliśmy zauważyć, że pierwszy słupek był nienaturalnie wyższy.
+\par
+Popatrzmy na dopasowanie dystrybuanty.
+
+```{r}
+empirical_cdf <- ecdf(log_AnnualIncome)
+fitted_cdf <- pnorm(sort(log_AnnualIncome), mean = mean(log_AnnualIncome), sd = sd(log_AnnualIncome))
+
+plot(empirical_cdf, main = "Porównanie dystrybuanty empirycznej i dopasowanej",
+     xlab = "Log(AnnualIncome)", ylab = "CDF", col = "blue", lwd = 3, xlim = c(9.75, 13))
+lines(sort(log_AnnualIncome), fitted_cdf, col = "red", lwd = 3)
+legend("bottomright", legend = c("Dystrybuanta empiryczna", "Dystrybuanta dopasowana"),
+       col = c("blue", "red"), lwd = 2)
+grid(nx = NULL, ny = NULL, col = "gray", lty = "solid", lwd = 1)
+
+```
+
+Tutaj również dopasowanie jest na pierwszy rzut oka idealne. Żeby potwierdzić domysły przeprowadźmy test Kołmogorowa - Smirnowa.
+\par
+
+\subsection{Analiza rozkładu - test Kołmogorowa-Smirnowa}
+
+```{r, message=FALSE,warning=FALSE}
+
+ks_test <- ks.test(log_AnnualIncome, "pnorm", mean = mean(log_AnnualIncome), sd = sd(log_AnnualIncome))
+ks_test
+
+```
+
+Ponieważ p-wartość jest niezwykle mała, odrzucamy hipotezę zerową, że dane po transformacji logarytmicznej pochodzą z dopasowanego rozkładu normalnego. Chociaż wizualne oceny sugerowały rozsądne dopasowanie, test statystyczny wskazuje, że rozkład normalny może nie w pełni oddawać charakterystykę danych po transformacji logarytmicznej. \par
+
+\newpage
+
+
+\hrule
+\section{5. Prawdopodobieństo wystąpienia wartości zmiennych jakościowych w całej populacji}
+\hrule
+
+\par
+
+Dla zmiennej jakościowej EducationLevel poniższy kod estymuje prawdopodobieństwo wystąpienia każdej wartości w całej populacji na podstawie obserwacji oraz oblicza przedziały ufności Wilsona  na poziomie 99%.
+
+```{r}
+value_counts <- dataSet %>%
+  group_by(EducationLevel) %>%
+  summarise(Count = n())
+
+
+total <- sum(value_counts$Count)
+
+value_counts <- value_counts %>%
+  mutate(
+    Proportion = Count / total,
+    CI_Lower = binom.confint(Count, total, conf.level = 0.99, methods = "wilson")$lower,
+    CI_Upper = binom.confint(Count, total, conf.level = 0.99, methods = "wilson")$upper
+  )
+print(value_counts)
+
+```
+
+W powyższej tabelce mamy poszczególne wartości zmiennej EducationLevel, ilość ich wystąpień w populacji, szacowane prawdopodobieństwo wystąpienia w całej populacji na podstawie próby. W ostatnich dwóch kolumnach mamy dolną i górną granicę przedziału ufności na poziomie 99%. Zauważmy, że nasze wyestymowane wartości prawdopodobieństwa leżą w przedziałach ufności.
+\par
+Zróbmy to samo dla drugiej zmiennej jakościowej - EmploymentStatus.
+
+```{r}
+value_counts2 <- dataSet %>%
+  group_by(EmploymentStatus) %>%
+  summarise(Count = n())
+
+
+total2 <- sum(value_counts2$Count)
+
+value_counts2 <- value_counts2 %>%
+  mutate(
+    Proportion = Count / total2,
+    CI_Lower = binom.confint(Count, total, conf.level = 0.99, methods = "wilson")$lower,
+    CI_Upper = binom.confint(Count, total, conf.level = 0.99, methods = "wilson")$upper
+  )
+print(value_counts2)
+
+```
+
+
+\hrule
+\section{6. Regresja liniowa zmiennej InterestRate względem zmiennych Age i AnnualIncome}
+\hrule
+
+\subsection{Model}
+
+```{r, collapse=TRUE}
+model <- lm(InterestRate ~ Age + AnnualIncome, data = dataSet)
+
+summary_model <- summary(model)
+coefficients <- summary_model$coefficients
+mse <- mean(summary_model$residuals^2)
+
+
+print("Współczynniki : ") 
+print(coefficients)
+print("Błąd średniokwadratowy : ") 
+print(mse)
+
+```
+
+W powyższym modelu zmiennymi objaśniającymi są zmienne ciągłe Age i AnnualIncome, a zmienną objaśnialną jest zmienna InterestRate. Wyestymowane współczynniki to: wyraz wolny = 2.698e-01, współczynnik przy zmiennej Age = -7.175e-04 oraz przy zmiennej AnnualIncome = -3.684e-08. Tak małe wartości są między innymi związane z jednostką w jakiej podana jest zmienna InterestRate. Ponadto możemy zauważyć, że współczynniki są ujemne, więc razem ze wzrostem wieku i rocznej pensji maleje oprocentowanie kredytu, czego można się było spodziewać. Błąd średniokwadratowy modelu wynosi : 1.7e-04.
+\par
+Wszystkie współczynniki nie są statycznie istotne. Współczynnik przy zmiennej AnnualIncome jest pomijalnie mały. Model nie byłby wcale o wiele gorszy jeśli jedyną zmienną objaśniającą byłaby zmienna Age.
+
+\newpage
+
+
+\hrule
+\section{7. Testowanie hipotez}
+\hrule
+
+\subsection{Test chi-kwadrat na niezależność zmiennej Age i zmiennej LoanApproved}
+
+\par
+Przeprowadzimy teraz test chi-kwadrat. 
+\par 
+Hipoteza zerowa : Wiek nie ma wpływu na akceptacje wniosku o pożyczkę.
+\par
+Hipoteza alternatywna : Wiek ma wpływ na akceptacje wniosku o pożyczkę.
+\par
+Przed wykonaniem testu podziele wiek na grupy wiekowe co ułatwi interpretowalność testu i zmiejszy liczbę unikalnych wartości.
+
+```{r}
+dataSet <- dataSet %>%
+  mutate(AgeGroup = cut(Age, breaks = c(18, 30, 40, 50, 60, 70), 
+                        labels = c("18-30", "31-40", "41-50", "51-60", "61-70")))
+
+
+```
+
+```{r}
+table <- table(dataSet$AgeGroup, dataSet$LoanApproved)
+
+chi_test <- chisq.test(table)
+
+
+
+cat("Hipoteza 1: Wiek a akceptacja wniosku o pożyczkę\n")
+cat("Statystyka Chi2: ", chi_test$statistic, "\n")
+cat("p-wartość: ", chi_test$p.value, "\n")
+```
+
+p-wartość jest bardzo mała, więc hipotezę zerową należy odrzucić. Więc zmienna Age ma wpływ na zmienną LoanApproved.
+\par
+
+\subsection{Test normalności Shapiro-Wilka na zmiennej CreditScore}
+
+Hipoteza zerowa : Punkty kredytowe mają rozkład normalny.
+\par
+Hipoteza alternatywna : Punkty kredytowe nie mają rozkładu normalnego.
+
+```{r}
+sample <- sample(dataSet$CreditScore, size = 5000, replace = FALSE)
+shapiro_test <- shapiro.test(sample)
+
+
+cat("Test Shapiro-Wilka dla zmiennej AnnualIncome:\n")
+cat("Statystyka Shapiro-Wilka: ", shapiro_test$statistic, "\n")
+cat("p-wartość: ", shapiro_test$p.value, "\n")
+
+```
+
+W powyższym teście pobrałem próbkę z danych, ponieważ dla tak dużej próbki test Shapiro-Wilka działa gorzej. \par 
+p-wartość jest bardzo mała, więc hipotezę zerową należy odrzucić. Zmienna nie ma rozkładu normalnego.
+
+
+
+
+
+
+
+
+
